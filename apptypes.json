@@ -1,0 +1,26 @@
+[{
+    "Description": "Εξαγωγή",
+    "DefaultDuration": 60,
+    "Color": "#CD5C5C"
+  },
+  {
+    "Description": "Σφράγισμα",
+    "DefaultDuration": 30,
+    "Color": "#FF7F50"
+  },
+  {
+    "Description": "Καθαρισμός",
+    "DefaultDuration": 25,
+    "Color": "#FFD700"
+  },
+  {
+    "Description": "Λέυκανση στο σπίτι",
+    "DefaultDuration": 60,
+    "Color": "#F0E68C"
+  },
+  {
+    "Description": "Λέυκανση στο ιατρείο",
+    "DefaultDuration": 120,
+    "Color": "#EE82EE"
+  }  
+]

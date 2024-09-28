@@ -1,0 +1,223 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+)
+
+type Appointment struct {
+	ID                uint      `gorm:"primaryKey;autoIncrement"`
+	PatientID         uint      `gorm:"not null"` // Foreign key to Patients
+	AppointmentTypeID uint      `gorm:"not null"` // Foreign key to AppointmentType
+	StartTime         time.Time `gorm:"not null"` // Start time of the appointment
+	Duration          int       `gorm:"not null"` // Duration in minutes
+	Viber             bool
+	Whatsapp          bool
+	SMS               bool
+	EmailNotification bool
+	Reminder          int // Reminder in hours before the appointment
+	// Relationships
+	Patient         Patient         `gorm:"foreignKey:PatientID"`         // Belongs to Patient
+	AppointmentType AppointmentType `gorm:"foreignKey:AppointmentTypeID"` // Belongs to AppointmentType
+}
+
+type Patient struct {
+	ID                uint   `gorm:"primaryKey;autoIncrement"`
+	Name              string `gorm:"type:varchar(255);not null"`
+	PhoneNumber       string `gorm:"type:varchar(20)"`
+	Email             string `gorm:"type:varchar(255)"`
+	Viber             bool
+	Whatsapp          bool
+	SMS               bool
+	EmailNotification bool
+	ReminderDays      int
+	Appointments      []Appointment `gorm:"foreignKey:PatientID"` // Relationship with Appointments
+}
+
+type AppointmentType struct {
+	ID              uint          `gorm:"primaryKey;autoIncrement"`
+	Description     string        `gorm:"type:varchar(255);not null"`
+	DefaultDuration int           `gorm:"not null"`                     // In minutes
+	Color           string        `gorm:"type:char(7)"`                 // e.g. #FFA07A
+	Appointments    []Appointment `gorm:"foreignKey:AppointmentTypeID"` // Relationship with Appointments
+}
+
+type AllAppointmentData struct {
+	ID                uint
+	PatientID         uint
+	AppointmentTypeID uint
+	StartTime         time.Time
+	Duration          int
+	Viber             bool
+	Whatsapp          bool
+	SMS               bool
+	EmailNotification bool
+	Reminder          int
+	PatientName       string
+	PhoneNumber       string
+	Description       string
+	Color             string
+}
+
+func initDB(endpoint, username, password string) (*gorm.DB, error) {
+	dsn := username + ":" + password + "@tcp(" + endpoint + ")/denti_db?charset=utf8mb4&parseTime=True&loc=Local" // Open the database connection
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database at %s: %w", endpoint, err)
+	}
+	return db, nil
+}
+
+func CreateAppointment(ctx context.Context, db *gorm.DB, appointment Appointment) (Appointment, error) {
+	// Use the passed db descriptor to create the appointment record
+	if err := db.Create(&appointment).Error; err != nil {
+		return Appointment{}, err
+	}
+	return appointment, nil
+}
+
+// GetMonthAppointments retrieves all appointments for a specific month
+func GetMonthAppointments(db *gorm.DB, year int, month time.Month) ([]Appointment, error) {
+	location, err := time.LoadLocation("Asia/Nicosia")
+	if err != nil {
+		panic(err)
+	}
+	startDate := time.Date(year, month, 1, 0, 0, 0, 0, location)
+	endDate := startDate.AddDate(0, 1, -1).Add(24 * time.Hour) // Last day of the month + 1 day
+	var appointments []Appointment
+	err = db.Where("start_time BETWEEN ? AND ?", startDate, endDate).Find(&appointments).Error
+	if err != nil {
+		return nil, err
+	}
+	return appointments, nil
+}
+
+// GetDayAppointments retrieves all appointments for a specific day
+func GetDayAppointments(db *gorm.DB, date time.Time) ([]Appointment, error) {
+
+	// Normalize the date to the start of the day
+	startDate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	// End of the day (23:59:59.999)
+	endDate := startDate.Add(24 * time.Hour).Add(-time.Millisecond)
+	db.Model(&Appointment{}).Select("appointments.ID, appointments.Patient_ID, " +
+		"appointments.Start_Time, appointments.Duration, appointments.viber, appointments.whatsapp, " +
+		"appointments.SMS, appointments.email_Notification, appointments.reminder, patients.Name AS PatientName, " +
+		"patients.Phone_Number, appointment_types.description, appointment_types.Color").Joins("join patients ON " +
+		"patients.ID = appointments.patient_ID join appointment_types " +
+		"ON appointment_types.ID = appointments.Appointment_Type_ID").Scan(&AllAppointmentData{})
+	var appointments []Appointment
+	err := db.Where("start_time BETWEEN ? AND ?", startDate, endDate).Find(&appointments).Error
+	if err != nil {
+		return nil, err
+	}
+	return appointments, nil
+}
+
+func main() {
+	fmt.Println("Lambda function to create appointment")
+	// Example database connection setup (replace with actual endpoint and credentials)
+	// Database Endpoint
+	dbEndpoint := "localhost:3306"
+	username := "dentist"
+	password := "dentpass"
+	// Initialize the database connection with the custom endpoint
+	db, err := initDB(dbEndpoint, username, password)
+	if err != nil {
+		log.Fatalf("Error initializing database at %s.\nFailed with '%s'\n", dbEndpoint, err)
+		return
+	}
+
+	// Migrate the schema
+	db.AutoMigrate(&Appointment{})
+	db.AutoMigrate(&Patient{})
+	db.AutoMigrate(&AppointmentType{})
+
+	// Create
+	db.Create(&AppointmentType{Description: "Εξαγωγή", DefaultDuration: 60, Color: "#CD5C5C"})
+	db.Create(&AppointmentType{Description: "Σφράγισμα", DefaultDuration: 30, Color: "#FF7F50"})
+	db.Create(&AppointmentType{Description: "Καθαρισμός", DefaultDuration: 25, Color: "#FFD700"})
+	db.Create(&AppointmentType{Description: "Λέυκανση στο σπίτι", DefaultDuration: 60, Color: "#F0E68C"})
+	db.Create(&AppointmentType{Description: "Λέυκανση στο ιατρείο", DefaultDuration: 120, Color: "#EE82EE"})
+	db.Create(&Patient{Name: "Άγγελος Βασιλείου", PhoneNumber: "+35799798389", Email: "angelos2225@hotmail.com", Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, ReminderDays: 180})
+	db.Create(&Patient{Name: "Χριστιάνα Νεοφύτου", PhoneNumber: "+35799365301", Email: "christiana2225@gmail.com", Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, ReminderDays: 360})
+
+	Nicosia, err := time.LoadLocation("Asia/Nicosia")
+	if err != nil {
+		panic(err)
+	}
+
+	db.Create(&Appointment{PatientID: 1, AppointmentTypeID: 1, StartTime: time.Date(2024, time.October, 15, 16, 30, 0, 0, Nicosia),
+		Duration: 30, Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, Reminder: 24})
+	db.Create(&Appointment{PatientID: 2, AppointmentTypeID: 1, StartTime: time.Date(2024, time.October, 15, 17, 30, 0, 0, Nicosia),
+		Duration: 30, Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, Reminder: 24})
+	db.Create(&Appointment{PatientID: 1, AppointmentTypeID: 2, StartTime: time.Date(2024, time.October, 16, 10, 30, 0, 0, Nicosia),
+		Duration: 30, Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, Reminder: 48})
+	db.Create(&Appointment{PatientID: 2, AppointmentTypeID: 2, StartTime: time.Date(2024, time.October, 16, 11, 0, 0, 0, Nicosia),
+		Duration: 30, Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, Reminder: 36})
+	db.Create(&Appointment{PatientID: 1, AppointmentTypeID: 1, StartTime: time.Date(2024, time.October, 20, 15, 30, 0, 0, Nicosia),
+		Duration: 30, Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, Reminder: 24})
+	db.Create(&Appointment{PatientID: 2, AppointmentTypeID: 1, StartTime: time.Date(2024, time.October, 20, 07, 30, 0, 0, Nicosia),
+		Duration: 30, Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, Reminder: 24})
+	db.Create(&Appointment{PatientID: 1, AppointmentTypeID: 2, StartTime: time.Date(2024, time.October, 22, 9, 30, 0, 0, Nicosia),
+		Duration: 30, Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, Reminder: 48})
+	db.Create(&Appointment{PatientID: 2, AppointmentTypeID: 2, StartTime: time.Date(2024, time.October, 22, 12, 0, 0, 0, Nicosia),
+		Duration: 30, Viber: true, Whatsapp: true, SMS: true, EmailNotification: true, Reminder: 36})
+
+	// Sample appointment data
+	appointment := Appointment{
+		PatientID:         1,
+		AppointmentTypeID: 1,
+		StartTime:         time.Now(),
+		Duration:          60,
+		Viber:             true,
+		Whatsapp:          false,
+		SMS:               true,
+		EmailNotification: true,
+		Reminder:          24,
+	}
+	// Create context
+	ctx := context.Background() // Call CreateAppointment with the db instance and sample data
+	createdAppointment, err := CreateAppointment(ctx, db, appointment)
+	if err != nil {
+		fmt.Println("Error creating appointment:", err)
+	} else {
+		fmt.Println("Appointment created successfully:", createdAppointment)
+	}
+	// Example usage of GetDayAppointments
+
+	// startDate := time.Date(year, month, 1, 0, 0, 0, 0, location)
+	// appointmentDay := time.Now()
+	appointmentDay := time.Date(2024, time.October, 16, 0, 0, 0, 0, Nicosia)
+
+	// Replace with the desired date
+	appointments, err := GetDayAppointments(db, appointmentDay)
+	if err != nil {
+		fmt.Println("Error retrieving appointments:", err)
+		return
+	}
+	// Print the appointments
+	for _, appointment := range appointments {
+		fmt.Printf("Appointment ID: %d, Start Time: %s\n", appointment.ID, appointment.StartTime)
+	}
+
+	// Example usage of GetMonthAppointments
+
+	year := time.Now().Year()
+	month := time.Now().Month()
+
+	appointments, err = GetMonthAppointments(db, year, month)
+	if err != nil {
+		fmt.Println("Error retrieving appointments:", err)
+		return
+	}
+	// Print the appointments
+	for _, appointment := range appointments {
+		fmt.Printf("Appointment ID: %d, Start Time: %s\n", appointment.ID, appointment.StartTime)
+	}
+
+}

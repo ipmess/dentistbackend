@@ -1,0 +1,243 @@
+# Appointment Management Application for a Dentist
+
+## Objective
+
+The aim is to develop a comprehensive and user-friendly appointment management system tailored to a dentist's needs. The dentist will manage all appointments through a web application on the desktop and an app on her iPhone.
+
+The system will include features such as:
+
+* synchronization with Google Calendar,
+* advanced filtering,
+* and data security.
+
+The solution will not allow any Internet users to book appointments themselves. The only person that will be able to book appointments will be the dentist, after verbal communication with each patient. During this verbal communication, the dentist wants to be able to view a calendar view of her schedule so she can offer options to the patients.
+
+## Architecture and technologies to be used in implementing this solution
+
+### Requirements Overview:
+
+The system will provide the dentist with the ability to:
+
+* Manage Appointments:
+   * Schedule and manage appointments, including the following details:
+      * Patient name
+      * Patient phone number
+      * Patient email
+      * Appointment type (e.g., cleaning, extraction, root canal)
+      * Start time and duration
+
+During the scheduling phase, the dentist needs to be able to quickly filter her calendar to see available time slots. The filtering needs will be, for example, "available time slots for a 40 minute appointment, during weekdays, after 16:00". Or, "1 hour appointment on Thursdays".
+
+* Calendar Views and Customization:
+   * Provide monthly, weekly, and daily calendar views.
+   * Offer customizable filters to view appointments by type, patient, or date range.
+   * Allow manual entry of off days (holidays or personal time) or specific off hours for rest or study.
+
+* Patient Information  View:
+   * View and edit patient details:
+     * Name
+     * Phone number
+     * email address
+     * Default notification preferences
+        * via Viber
+        * via email
+        * via SMS
+        * via WhatsApp
+    * View the patient's appointment history (only date, duration, and type of appointment)
+
+* Data Management:
+   * Auto-complete patient information from the database (names, phone numbers, and email) during the appointment phase.
+   * Dropdown menus for selecting appointment type.
+   * The duration of each appointment is a custom value.
+
+Each appointment type will have a default value, (for example: extraction: 30 minutes), but depending on each patient and the particular medical case, the dentist must have the capability during booking to edit this value to whatever duration she might need.
+
+* Conflict Detection:
+   * The appointment scheduling logic should not allow the dentist to book overlapping appointments.
+   * Include an appointment conflict checker that alerts the dentist of scheduling conflicts (e.g., overlapping appointments) before confirming new appointments.
+
+* Google Calendar Integration:
+  * Synchronize all appointments with Google Calendar in near-real-time.
+  * Detect external changes made directly in Google Calendar via Google Calendar Push Notifications (webhooks) and update the application accordingly.
+  * The dentist does not currently expect to be booking appointments through Google Calendar, so this should not be supported.
+  * Support at the movement of appointments around (for rescheduling, for example).
+
+* Offline Mode for Mobile App:
+  * Provide an offline mode for the mobile app, allowing the dentist to view and manage appointments without internet access. Changes made offline will synchronize with the backend when an Internet connection is restored.
+
+* Data Security:
+  * Encrypt data at rest using Transparent Data Encryption (TDE) with AWS RDS.
+  * Secure data in transit via HTTPS
+  * Store encryption keys using AWS Key Management Service (KMS).
+
+## Proposed Architecture
+
+1. Backend: REST API Built with Go
+
+The backend will be built using Go. It will leverage REST API architecture for handling appointment and patient management tasks.
+The backend will also:
+
+* Synchronize all appointment and patient data to the database
+* Synchronize the appointments with Google Calendar
+* Synchronize all appointment and patient data between the web application and the mobile app
+* Provide appointment and patient data to the web application and the mobile app.
+
+### Backend Components:
+
+* API Server: Developed using Go frameworks like Gin or Echo, the API will manage the following operations:    
+  * `POST /appointments`: Create a new appointment.
+  * `POST /patients`: Add a new patient.
+  * `GET /appointments`: Retrieve all appointments, with filtering options by date, patient, or type.
+  * `GET /appointments/:id`: Retrieve a specific appointment.
+  * `PUT /appointments/:id`: Update an existing appointment.
+  * `DELETE /appointments/:id`: Cancel an appointment.
+  * `GET /patients/:id`: Retrieve patient details, including appointment history.
+
+### Backend Features:
+
+* Conflict Detection: Before confirming an appointment, the system will check for any time conflicts with other scheduled appointments.
+* Google Calendar Integration: Integrate with the Google Calendar API to sync appointments, using push notifications (webhooks) to detect and respond to changes made externally.
+* Token-Based Authentication: Secure API access using JWT tokens for authentication.
+* Encryption: Store all data with AWS RDS using Transparent Data Encryption (TDE).
+
+### Google Calendar Sync
+
+* Synchronize all appointments with Google Calendar
+* Authenticate to Google Calendar using OAuth 2.0.
+* Store the OAuth 2.0 credentials on AWS KMS.
+* Implement Push Notifications (webhooks) from Google Calendar to detect changes made directly on Google Calendar and sync them with the backend and in turn with the frontend components.
+
+### Deployment of backend
+
+* AWS EC2 or Lambda: The Go API will run on AWS.
+* AWS RDS with MariaDB: Use AWS RDS for storage of appointment and patient data.
+
+2. Frontend Components
+
+### Web Application (Desktop):
+
+The desktop interface will be built using React.js to provide an experience similar to Google Calendar with advanced filtering options.
+
+* Calendar Views: Integrate FullCalendar.js to support monthly, weekly, and daily views.
+  * Drag-and-drop rescheduling for appointments.
+  * Click-to-create interactions and tooltips to display appointment details.
+  * Custom Filters: The Dentist will be able to filter appointments by type, patient, or time range.
+  * In calendar view, each type of appointment should be color-coded.
+* Appointment Management: Forms will allow the dentist to:
+  * Select a patient from a searchable dropdown.
+  * Auto-populate patient details, including phone numbers and email.
+  * Select appointment types and time slots with ease.
+
+### Mobile Application:
+
+The mobile app will be developed using React Native with Expo to streamline development and ensure cross-platform compatibility (iOS and Android).
+
+* Calendar Views: Similar to the desktop, a mobile-friendly version using libraries like react-native-calendars.
+* Offline Mode: The mobile app will include an offline mode, allowing the dentist to access and manage appointments without an internet connection. Changes will sync when reconnected to the backend.
+* Optimized Touch Experience: Forms and interaction patterns will be designed for ease of use on touch devices.
+
+#### State Management:
+
+* Redux will be used for state management, to maintain a consistent state across both web and mobile applications.
+
+3. Database and Synchronization
+
+### Database:
+
+The backed will communicate with MariaDB running on AWS RDS. The MariaDB database will serve as the central database.
+
+#### Database Schema:
+      
+* Patients Table: Stores patient information
+   * patient_id
+   * name
+   * phone_number
+   * email
+   * Default_contact_preferences
+      * Viber
+      * WhatsApp
+      * SMS
+      * email
+      * hours before appointment time
+      * Every how many days since the last appointment does the patient want to be reminded that they should come back for a visit
+   * default notification preferences since last appointment (days)
+
+* Appointments Table: Stores appointment details
+   * ID (primary key, unique ID per appointment)
+   * patient_id (which references the patient_id of the Patients table)
+   * Appointment type ID (which references the Appointment type_id of the AppointmentType table)
+   * start_date_time
+   * duration
+   * Viber (whether the patient wants to notified about this appointment via Viber)
+   * WhatsApp (whether the patient wants to notified about this appointment via WhatsApp)
+   * email (whether the patient wants to notified about this appointment via email)
+   * SMS (whether the patient wants to notified about this appointment via SMS)
+   * Reminder (the number of hours before the appointment that the patient wants to be remind
+
+* Appointment Type table: stores a description and some defaults per appointment type
+   * ID (primary key, unique ID per appointment type)
+   * Description (string describing the type of appointment (extraction, filling, cleaning, whitening, etc))
+   * Default Duration (in minutes)
+   * Color (e.g. #FFA07A, used as a color in calendar view for all appointments of this type)
+
+## User Experience (UX)
+
+To ensure the system is intuitive and easy to use, the following key UX features will be included:
+
+* Google Calendar-Like Interface: Both web and mobile interfaces will resemble Google Calendar, providing familiar navigation and scheduling features.
+* Custom Filters: The ability to filter appointments by patient, type, or time range enhances usability.
+* Appointment Conflict Alerts: An automatic checker for overlapping appointments ensures that the dentist won’t inadvertently schedule conflicting appointments.
+* Manual Off Days/Hours Entry: The dentist can easily schedule time off or block off specific hours for personal reasons, which will be reflected across all platforms and in Google Calendar.
+
+## Deployment Plan
+
+### Frontend Deployment:
+
+* React.js Web App: Deploy the web-based frontend via Netlify or on an AWS EC2 instance behind Nginx.
+* React Native Mobile App: Deploy the mobile app using Expo, and submit it to both the Apple App Store.
+
+### Backend Deployment:
+
+* Go REST API: Hosted on AWS Lambda (serverless) or AWS EC2.
+* Database: MariaDB on AWS RDS. Deploy Transparent Data Encryption (TDE) on RDS.
+
+## Work-in-progress notes
+
+To connect to the local database on the local host, run:
+
+```
+mariadb -udentist -p denti_db
+```
+
+The password for the _dentist_ user is in the `config.json` file.
+
+Once in MariaDB, run the following to verify that all the tables are there:
+
+```
+MariaDB [denti_db]> show tables;
++--------------------+
+| Tables_in_denti_db |
++--------------------+
+| appointment_types  |
+| appointments       |
+| patients           |
++--------------------+
+3 rows in set (0.001 sec)
+```
+
+To drop all tables, run:
+
+```
+MariaDB [denti_db]> drop table appointments;
+Query OK, 0 rows affected (0.448 sec)
+
+MariaDB [denti_db]> drop table appointment_types;
+Query OK, 0 rows affected (0.169 sec)
+
+MariaDB [denti_db]> drop table patients;
+Query OK, 0 rows affected (0.227 sec)
+
+MariaDB [denti_db]> show tables;
+Empty set (0.001 sec)
+
+```
