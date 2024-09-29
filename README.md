@@ -2,7 +2,7 @@
 
 ## Objective
 
-The aim is to develop a comprehensive and user-friendly appointment management system tailored to a dentist's needs. The dentist will manage all appointments through a web application on the desktop and an app on her iPhone.
+The aim is to develop a comprehensive and user-friendly appointment management system tailored to a dentist's needs. The dentist will manage all appointments through a web application on the desktop and a native app on her iPhone.
 
 The system will include features such as:
 
@@ -84,14 +84,32 @@ The backend will also:
 
 ### Backend Components:
 
-* API Server: Developed using Go frameworks like Gin or Echo, the API will manage the following operations:    
-  * `POST /appointments`: Create a new appointment.
-  * `POST /patients`: Add a new patient.
-  * `GET /appointments`: Retrieve all appointments, with filtering options by date, patient, or type.
-  * `GET /appointments/:id`: Retrieve a specific appointment.
-  * `PUT /appointments/:id`: Update an existing appointment.
-  * `DELETE /appointments/:id`: Cancel an appointment.
-  * `GET /patients/:id`: Retrieve patient details, including appointment history.
+- **API Server**: Developed using Go frameworks like **Gin**, the API will manage the following endpoints:
+
+#### API endpoints
+
+##### Appointments
+
+* `POST /appointments` to create an appointment
+* `GET /appointments/monthyear` to get a list of all appointments for a particular month/year.
+* `GET /appointments/weekyear` to get a list of all appointments for a particular week/year.
+* `GET /appointments/date` to get a list of all appointments for a particular date.
+* `GET /appointments/:id` to get a specific appointment
+* `PUT /appointments/:id` to update a specific appointment
+* `DELETE /appointments/:id` to delete a specific appointment
+
+##### Patients
+
+* `POST /patients` to create a patient
+* `GET /patients` to get all patients
+* `GET /patients/:id` to get a specific patient
+* `PUT /patients/:id` to update a specific patient
+* `GET /patients/:id/appointments` to get a list of all appointments for a particular patient.
+* `DELETE /patients/:id` to delete a patient
+
+#### API endpoint testing
+
+The endpoint testing should test the REST API endpoints.
 
 ### Backend Features:
 
@@ -144,12 +162,13 @@ The mobile app will be developed using React Native with Expo to streamline deve
 
 ### Database:
 
-The backed will communicate with MariaDB running on AWS RDS. The MariaDB database will serve as the central database.
+The backend will communicate with MariaDB running on AWS RDS. The MariaDB database will serve as the central database.
 
 #### Database Schema:
       
 * Patients Table: Stores patient information
    * patient_id
+   * patient_UUID
    * name
    * phone_number
    * email
@@ -164,6 +183,7 @@ The backed will communicate with MariaDB running on AWS RDS. The MariaDB databas
 
 * Appointments Table: Stores appointment details
    * ID (primary key, unique ID per appointment)
+   * appointment_UUID
    * patient_id (which references the patient_id of the Patients table)
    * Appointment type ID (which references the Appointment type_id of the AppointmentType table)
    * start_date_time
@@ -194,7 +214,7 @@ To ensure the system is intuitive and easy to use, the following key UX features
 ### Frontend Deployment:
 
 * React.js Web App: Deploy the web-based frontend via Netlify or on an AWS EC2 instance behind Nginx.
-* React Native Mobile App: Deploy the mobile app using Expo, and submit it to both the Apple App Store.
+* React Native Mobile App: Deploy the mobile app using Expo, and submit it to the Apple App Store.
 
 ### Backend Deployment:
 
@@ -203,10 +223,84 @@ To ensure the system is intuitive and easy to use, the following key UX features
 
 ## Work-in-progress notes
 
+My development environment includes a locally running MariaDB, with a dentist user and a database for this project. Steps to install a local instance of MariaDB, create a user, and a database:
+
+```
+sudo apt-install mariadb-server
+```
+
+After you install the mariadb server on the local machine, confirm that it is running:
+
+```
+sudo systemctl status mariadb
+```
+
+(it should say `active (running)`)
+
+Next, let's connect to the MariDB instance:
+
+```
+$ sudo mariadb -uroot -p -h localhost
+```
+
+You should get a MariaDB prompt:
+
+```
+MariaDB [(none)]>
+```
+
+In the MariaDB CLI, enter the following commands:
+
+**Create a user for the application:**
+
+```
+CREATE USER `dentist`@`%` IDENTIFIED BY `somelamepass`;
+```
+**Create a database for the application:**
+
+```
+CREATE DATABSE appointments_db;
+```
+**Grant rights to the new database to the application's user:**
+
+```
+GRANT ALL PRIVILEGES ON appointments_db.* TO `dentist`@`%` WITH GRANT OPTION;
+```
+
+Use the `quit` command in MariaDB to leave the MariaDB CLI. From your host, confirm you can connect to the newly created database using the new user's credentials:
+
+```
+$mariadb -u dentist -p appointments_db
+```
+
+And you should now get a (different) prompt from MariaDB:
+
+```
+MariaDB [appointments_db]>
+```
+
+#### JSON config file
+
+Once you have the develepment database in place, you can now configure the `config.json` file that the application is expecting so you can connect to this database.
+
+**Sample `config.json`:**
+
+```
+{
+   "db_endpoint": "localhost:3306",
+   "username": "dentist",
+   "password": "somelamepassword",
+   "database": "appointments_db"
+   "populate_db": true
+}
+```
+
+#### To clear the current database and re-populate it with sample data:
+
 To connect to the local database on the local host, run:
 
 ```
-mariadb -udentist -p denti_db
+mariadb -udentist -p appointments_db
 ```
 
 The password for the _dentist_ user is in the `config.json` file.
@@ -214,30 +308,30 @@ The password for the _dentist_ user is in the `config.json` file.
 Once in MariaDB, run the following to verify that all the tables are there:
 
 ```
-MariaDB [denti_db]> show tables;
-+--------------------+
-| Tables_in_denti_db |
-+--------------------+
-| appointment_types  |
-| appointments       |
-| patients           |
-+--------------------+
+MariaDB [appointments_db]> show tables;
++---------------------------+
+| Tables_in_appointments_db |
++---------------------------+
+| appointment_types         |
+| appointments              |
+| patients                  |
++---------------------------+
 3 rows in set (0.001 sec)
 ```
 
 To drop all tables, run:
 
 ```
-MariaDB [denti_db]> drop table appointments;
+MariaDB [appointments_db]> drop table appointments;
 Query OK, 0 rows affected (0.448 sec)
 
-MariaDB [denti_db]> drop table appointment_types;
+MariaDB [appointments_db]> drop table appointment_types;
 Query OK, 0 rows affected (0.169 sec)
 
-MariaDB [denti_db]> drop table patients;
+MariaDB [appointments_db]> drop table patients;
 Query OK, 0 rows affected (0.227 sec)
 
-MariaDB [denti_db]> show tables;
+MariaDB [appointments_db]> show tables;
 Empty set (0.001 sec)
 
 ```
