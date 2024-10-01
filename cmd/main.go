@@ -4,56 +4,15 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
-type Appointment struct {
-	// A structure to hold appointment data
-	gorm.Model
-	ID                uint      `gorm:"primaryKey;autoIncrement"`
-	PatientID         uint      `gorm:"not null"` // Foreign key to Patients
-	AppointmentTypeID uint      `gorm:"not null"` // Foreign key to AppointmentType
-	StartTime         time.Time `gorm:"not null"` // Start time of the appointment
-	Duration          int       `gorm:"not null"` // Duration in minutes
-	Viber             bool
-	Whatsapp          bool
-	SMS               bool
-	EmailNotification bool
-	Reminder          int // Reminder in hours before the appointment
-	// Relationships
-	Patient         Patient         `gorm:"foreignKey:PatientID"`         // Belongs to Patient
-	AppointmentType AppointmentType `gorm:"foreignKey:AppointmentTypeID"` // Belongs to AppointmentType
-}
-
-type Patient struct {
-	// A structure to hold patient data
-	gorm.Model
-	ID                uint   `gorm:"primaryKey;autoIncrement"`
-	Name              string `gorm:"type:varchar(255);not null"`
-	PhoneNumber       string `gorm:"type:varchar(20)"`
-	Email             string `gorm:"type:varchar(255)"`
-	Viber             bool
-	Whatsapp          bool
-	SMS               bool
-	EmailNotification bool
-	ReminderDays      int
-	Appointments      []Appointment `gorm:"foreignKey:PatientID"` // Relationship with Appointments
-}
-
-// AppointmentType represents a type of appointment in the system.
-// It includes details such as a description, default duration, and color code.
-// This structure is linked to the Appointment model through a foreign key relationship.
-// There should only be a limited number of appointment types
-type AppointmentType struct {
-	gorm.Model
-	ID              uint          `gorm:"primaryKey;autoIncrement"`
-	Description     string        `gorm:"type:varchar(255);not null"`
-	DefaultDuration int           `gorm:"not null"`                     // In minutes
-	Color           string        `gorm:"type:char(7)"`                 // e.g. #FFA07A
-	Appointments    []Appointment `gorm:"foreignKey:AppointmentTypeID"` // Relationship with Appointments
-}
+var db *gorm.DB
+var ctx context.Context
 
 func main() {
 	// Load Database Endpoint configuration from local config.json file:
@@ -64,14 +23,14 @@ func main() {
 	}
 
 	// Initialize the database connection with the custom endpoint
-	db, err := initDB(config.DBEndpoint, config.Database, config.Username, config.Password)
+	db, err = initDB(config.DBEndpoint, config.Database, config.Username, config.Password)
 	if err != nil {
 		log.Fatalf("error initializing database at %s.\nFailed with '%s'\n", config.DBEndpoint, err)
 		return
 	}
 	db.AutoMigrate(&Appointment{}, &Patient{}, &AppointmentType{})
 	// Create context
-	ctx := context.Background()
+	ctx = context.Background()
 
 	if config.PopulateDB {
 		// Populate the database with sample data:
@@ -100,8 +59,9 @@ func main() {
 	if err != nil {
 		log.Printf("Error creating appointment: %s", err)
 	} else {
-		printAppointment(createdAppointment)
+		PrintAppointment(createdAppointment)
 	}
+
 	// Example usage of GetDayAppointments
 	appointmentDay := time.Now().AddDate(0, 0, 20)
 	appointments, err := GetDayAppointments(db, appointmentDay)
@@ -112,7 +72,7 @@ func main() {
 
 	// Print the appointments for the day
 	fmt.Printf("Appointments for day %s :\n", appointmentDay)
-	printAppointments(appointments)
+	PrintAppointments(appointments)
 	fmt.Printf("End of list of appointments for day %s \n", appointmentDay)
 
 	// Example usage of GetMonthAppointments
@@ -127,7 +87,7 @@ func main() {
 	}
 	// Print the Month's appointments
 	fmt.Printf("Appointments for month %s :\n", time.Now().Format("January 2006"))
-	printAppointments(appointments)
+	PrintAppointments(appointments)
 
 	// Example usage of GetDayAppointments
 	appointmentDay = time.Date(2024, 10, 25, 0, 0, 0, 0, time.Local)
@@ -139,7 +99,7 @@ func main() {
 
 	// Print the appointments for the day
 	fmt.Printf("Appointments for day %s :\n", appointmentDay)
-	printAppointments(appointments)
+	PrintAppointments(appointments)
 	fmt.Printf("End of list of appointments for day %s \n", appointmentDay)
 
 	// sample Patient data:
@@ -163,4 +123,21 @@ func main() {
 
 	fmt.Printf("Patient created successfully: %s\n", pat.Name)
 	PrintPatient(pat)
+
+	// implement a simple home page for the REST API:
+	// Start the gorilla/mux server:
+	router := mux.NewRouter()
+
+	home := homeHandler{}
+
+	// Register the routes
+	router.HandleFunc("/", home.ServeHTTP)
+	router.HandleFunc("/patients", NewPatient).Methods("POST")
+	router.HandleFunc("/patients", ListPatients).Methods("GET")
+	router.HandleFunc("/patients/{uuid}", GetPatient).Methods("GET")
+	router.HandleFunc("/patients/{uuid}", UpdatePatient).Methods("PUT")
+	router.HandleFunc("/patients/{uuid}", DeletePatient).Methods("DELETE")
+
+	// Start the server
+	http.ListenAndServe(":8080", router)
 }

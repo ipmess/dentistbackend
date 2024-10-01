@@ -10,6 +10,37 @@ import (
 	"gorm.io/gorm"
 )
 
+type Appointment struct {
+	// A structure to hold appointment data
+	gorm.Model
+	ID                uint      `gorm:"primaryKey;autoIncrement"`
+	PatientID         uint      `gorm:"not null"` // Foreign key to Patients
+	AppointmentTypeID uint      `gorm:"not null"` // Foreign key to AppointmentType
+	StartTime         time.Time `gorm:"not null"` // Start time of the appointment
+	Duration          int       `gorm:"not null"` // Duration in minutes
+	Viber             bool
+	Whatsapp          bool
+	SMS               bool
+	EmailNotification bool
+	Reminder          int // Reminder in hours before the appointment
+	// Relationships
+	Patient         Patient         `gorm:"foreignKey:PatientID"`         // Belongs to Patient
+	AppointmentType AppointmentType `gorm:"foreignKey:AppointmentTypeID"` // Belongs to AppointmentType
+}
+
+// AppointmentType represents a type of appointment in the system.
+// It includes details such as a description, default duration, and color code.
+// This structure is linked to the Appointment model through a foreign key relationship.
+// There should only be a limited number of appointment types
+type AppointmentType struct {
+	gorm.Model
+	ID              uint          `gorm:"primaryKey;autoIncrement"`
+	Description     string        `gorm:"type:varchar(255);not null"`
+	DefaultDuration int           `gorm:"not null"`                     // In minutes
+	Color           string        `gorm:"type:char(7)"`                 // e.g. #FFA07A
+	Appointments    []Appointment `gorm:"foreignKey:AppointmentTypeID"` // Relationship with Appointments
+}
+
 func CreateAppointment(ctx context.Context, db *gorm.DB, appointment Appointment) (Appointment, error) {
 	// Use the passed db descriptor to create the appointment record
 	db.Model(&appointment).Association("Patient")
@@ -52,7 +83,7 @@ func CreateAppointment(ctx context.Context, db *gorm.DB, appointment Appointment
 	lastAppointmentsEndTime := lastAppointment.StartTime.Add(time.Duration(lastAppointment.Duration) * time.Minute)
 	if lastAppointmentsEndTime.After(appointment.StartTime) {
 		fmt.Printf("Overlapping appointment:\n")
-		printAppointment(lastAppointment)
+		PrintAppointment(lastAppointment)
 		return appointment, fmt.Errorf("appointment overlaps with an existing appointment")
 	}
 
@@ -112,7 +143,7 @@ func GetDayAppointments(db *gorm.DB, date time.Time) ([]Appointment, error) {
 	return appointments, nil
 }
 
-func printAppointments(appointments []Appointment) {
+func PrintAppointments(appointments []Appointment) {
 	fmt.Printf("---------------------------------------------------\n")
 	for _, appointment := range appointments {
 		fmt.Printf("Appointment ID: %d, Start Time: %s\n", appointment.ID, appointment.StartTime.Format("15:04"))
@@ -123,7 +154,7 @@ func printAppointments(appointments []Appointment) {
 	fmt.Printf("---------------------------------------------------\n\n")
 }
 
-func printAppointment(appointment Appointment) {
+func PrintAppointment(appointment Appointment) {
 	type appointmentForPrinting struct {
 		// Define a struct for printing the appointment. Similar fields to the original appointment struct, except create a string for the start time:
 		ID                uint
@@ -157,18 +188,4 @@ func printAppointment(appointment Appointment) {
 
 	json_appointment, _ := json.MarshalIndent(appointmentForPrint, "", "  ")
 	fmt.Println(string(json_appointment))
-}
-
-// CreatePatient creates a new patient record in the database
-func CreatePatient(ctx context.Context, db *gorm.DB, patient Patient) (Patient, error) {
-	if err := db.Create(&patient).Error; err != nil {
-		return Patient{}, err
-	}
-	return patient, nil
-}
-
-// PrintPatient prints the patient details
-func PrintPatient(patient Patient) {
-	patient_json, _ := json.MarshalIndent(patient, "", "  ")
-	fmt.Println(string(patient_json))
 }

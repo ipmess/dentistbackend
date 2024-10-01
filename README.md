@@ -91,21 +91,21 @@ The backend will also:
 ##### Appointments
 
 * `POST /appointments` to create an appointment
-* `GET /appointments/monthyear` to get a list of all appointments for a particular month/year.
-* `GET /appointments/weekyear` to get a list of all appointments for a particular week/year.
+* `GET /appointments/month` to get a list of all appointments for a particular month/year.
+* `GET /appointments/week` to get a list of all appointments for a particular week/year.
 * `GET /appointments/date` to get a list of all appointments for a particular date.
-* `GET /appointments/:id` to get a specific appointment
-* `PUT /appointments/:id` to update a specific appointment
-* `DELETE /appointments/:id` to delete a specific appointment
+* `GET /appointments/:uuid` to get a specific appointment
+* `PUT /appointments/:uuid` to update a specific appointment
+* `DELETE /appointments/:uuid` to delete a specific appointment
 
 ##### Patients
 
 * `POST /patients` to create a patient
 * `GET /patients` to get all patients
-* `GET /patients/:id` to get a specific patient
-* `PUT /patients/:id` to update a specific patient
-* `GET /patients/:id/appointments` to get a list of all appointments for a particular patient.
-* `DELETE /patients/:id` to delete a patient
+* `GET /patients/:uuid` to get a specific patient
+* `PUT /patients/:uuid` to update a specific patient
+* `GET /patients/:uuid/appointments` to get a list of all appointments for a particular patient.
+* `DELETE /patients/:uuid` to delete a patient
 
 #### API endpoint testing
 
@@ -259,7 +259,7 @@ CREATE USER `dentist`@`%` IDENTIFIED BY `somelamepass`;
 **Create a database for the application:**
 
 ```
-CREATE DATABSE appointments_db;
+CREATE DATABASE appointments_db;
 ```
 **Grant rights to the new database to the application's user:**
 
@@ -281,7 +281,7 @@ MariaDB [appointments_db]>
 
 #### JSON config file
 
-Once you have the develepment database in place, you can now configure the `config.json` file that the application is expecting so you can connect to this database.
+Once you have the development database in place, you can now configure the `config.json` file that the application is expecting so you can connect to this database.
 
 **Sample `config.json`:**
 
@@ -289,7 +289,7 @@ Once you have the develepment database in place, you can now configure the `conf
 {
    "db_endpoint": "localhost:3306",
    "username": "dentist",
-   "password": "somelamepassword",
+   "password": "somelamepass",
    "database": "appointments_db"
    "populate_db": true
 }

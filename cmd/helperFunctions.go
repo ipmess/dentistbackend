@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"time"
 
@@ -195,4 +196,14 @@ func populate(ctx context.Context, db *gorm.DB) error {
 
 	}
 	return nil
+}
+
+type homeHandler struct{}
+
+func (h *homeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	w.Write([]byte("Appointment Scheduler API"))
 }
