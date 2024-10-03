@@ -77,10 +77,7 @@ func main() {
 
 	// Example usage of GetMonthAppointments
 
-	year := time.Now().Year()
-	month := time.Now().Month()
-
-	appointments, err = GetMonthAppointments(db, year, month)
+	appointments, err = GetMonthAppointments(db, time.Now())
 	if err != nil {
 		log.Fatalf("Error retrieving appointments:\n%s", err)
 		return
@@ -128,16 +125,29 @@ func main() {
 	// Start the gorilla/mux server:
 	router := mux.NewRouter()
 
-	home := homeHandler{}
-
 	// Register the routes
-	router.HandleFunc("/", home.ServeHTTP)
+	router.HandleFunc("/", serveHome)
 	router.HandleFunc("/patients", NewPatient).Methods("POST")
 	router.HandleFunc("/patients", ListPatients).Methods("GET")
 	router.HandleFunc("/patients/{uuid}", GetPatient).Methods("GET")
 	router.HandleFunc("/patients/{uuid}", UpdatePatient).Methods("PUT")
 	router.HandleFunc("/patients/{uuid}", DeletePatient).Methods("DELETE")
+	router.HandleFunc("/appointments", NewAppointment).Methods("POST")
+	router.HandleFunc("/appointments/date", ListAppointments).Methods("GET")
+	/*router.HandleFunc("/appointments/{uuid}", GetPatient).Methods("GET")
+	router.HandleFunc("/appointments/{uuid}", UpdatePatient).Methods("PUT")
+	router.HandleFunc("/appointments/{uuid}", DeletePatient).Methods("DELETE")*/
 
 	// Start the server
 	http.ListenAndServe(":8080", router)
 }
+
+/*
+* `POST /appointments` to create an appointment
+* `GET /appointments/month` to get a list of all appointments for a particular month/year.
+* `GET /appointments/week` to get a list of all appointments for a particular week/year.
+* `GET /appointments/date` to get a list of all appointments for a particular date.
+* `GET /appointments/:uuid` to get a specific appointment
+* `PUT /appointments/:uuid` to update a specific appointment
+* `DELETE /appointments/:uuid` to delete a specific appointment
+ */

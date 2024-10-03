@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -14,6 +17,7 @@ type Appointment struct {
 	// A structure to hold appointment data
 	gorm.Model
 	ID                uint      `gorm:"primaryKey;autoIncrement"`
+	uuid              string    `gorm:"type:uuid;default:UUIDv7();unique;not null"`
 	PatientID         uint      `gorm:"not null"` // Foreign key to Patients
 	AppointmentTypeID uint      `gorm:"not null"` // Foreign key to AppointmentType
 	StartTime         time.Time `gorm:"not null"` // Start time of the appointment
@@ -26,6 +30,33 @@ type Appointment struct {
 	// Relationships
 	Patient         Patient         `gorm:"foreignKey:PatientID"`         // Belongs to Patient
 	AppointmentType AppointmentType `gorm:"foreignKey:AppointmentTypeID"` // Belongs to AppointmentType
+}
+
+// limit the appointmentRequest.timeFrame to the following values:
+// day, week, month, year
+type TimeFrame string
+
+const (
+	Day   TimeFrame = "day"
+	Week  TimeFrame = "week"
+	Month TimeFrame = "month"
+	Year  TimeFrame = "year"
+)
+
+type appointmentRequest struct {
+	// a structure to hold the request data for listing appointments
+	Frame     TimeFrame
+	StartDate string
+}
+
+// Validate checks if the timeFrame is one of the allowed values
+func (ar *appointmentRequest) Validate() error {
+	switch ar.Frame {
+	case Day, Week, Month, Year:
+		return nil
+	default:
+		return errors.New("invalid time frame")
+	}
 }
 
 // AppointmentType represents a type of appointment in the system.
@@ -112,12 +143,12 @@ func CreateAppointment(ctx context.Context, db *gorm.DB, appointment Appointment
 }
 
 // GetMonthAppointments retrieves all appointments for a specific month
-func GetMonthAppointments(db *gorm.DB, year int, month time.Month) ([]Appointment, error) {
+func GetMonthAppointments(db *gorm.DB, appointmentDate time.Time) ([]Appointment, error) {
 	location, err := time.LoadLocation("Asia/Nicosia")
 	if err != nil {
 		panic(err)
 	}
-	startDate := time.Date(year, month, 1, 0, 0, 0, 0, location)
+	startDate := time.Date(appointmentDate.Year(), appointmentDate.Month(), 1, 0, 0, 0, 0, location)
 	endDate := startDate.AddDate(0, 1, -1).Add(24 * time.Hour) // Last day of the month + 1 day
 	var appointments []Appointment
 	err = db.Preload("Patient").Preload("AppointmentType").Where("start_time BETWEEN ? AND ?", startDate, endDate).Order("start_time asc").Find(&appointments).Error
@@ -188,4 +219,96 @@ func PrintAppointment(appointment Appointment) {
 
 	json_appointment, _ := json.MarshalIndent(appointmentForPrint, "", "  ")
 	fmt.Println(string(json_appointment))
+}
+
+func NewAppointment(w http.ResponseWriter, r *http.Request) {
+	var appointment Appointment
+	err := json.NewDecoder(r.Body).Decode(&appointment)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	appointment.CreatedAt = time.Now()
+	appointment.UpdatedAt = time.Now()
+	appointment.ID = 0
+	tempUUID, _ := uuid.NewV7()
+	appointment.uuid = tempUUID.String()
+
+	appointment, err = CreateAppointment(ctx, db, appointment)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(appointment)
+}
+
+func ListAppointments(w http.ResponseWriter, r *http.Request) {
+	// the request should include a time frame and a start date:
+	var request appointmentRequest
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err = request.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var appointments []Appointment
+
+	// convert request.StartDate from string to time.Time:
+	requestStartTime, err := time.Parse("02-01-2006", request.StartDate)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	switch request.Frame {
+	case Day:
+		appointments, err = GetDayAppointments(db, requestStartTime)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	case Month:
+		appointments, err = GetMonthAppointments(db, requestStartTime)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	case Week:
+		monthsAppointments, err := GetMonthAppointments(db, requestStartTime)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// Filter the appointments to only include the appointments for the week:
+		for _, appointment := range monthsAppointments {
+			if appointment.StartTime.Before(requestStartTime.AddDate(0, 0, 7)) {
+				appointments = append(appointments, appointment)
+			}
+		}
+
+	case Year:
+
+		for m := 0; m < 12; m++ {
+
+			monthsAppointments, err := GetMonthAppointments(db, requestStartTime.AddDate(0, m, 0))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			// append the Month's appointments to the appointments slice:
+			appointments = append(appointments, monthsAppointments...)
+		}
+
+	default:
+		http.Error(w, "invalid time frame", http.StatusInternalServerError)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(appointments)
+
 }
