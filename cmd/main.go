@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/ipmess/dentistbackend/pkg/appointments"
+	"github.com/ipmess/dentistbackend/pkg/authenticationHelper"
 	"github.com/ipmess/dentistbackend/pkg/models"
 	"github.com/ipmess/dentistbackend/pkg/patient"
 	"gorm.io/gorm"
@@ -151,6 +152,7 @@ func main() {
 	router.HandleFunc("/appointments/{uuid}", appointmentHandler.GetAppointment).Methods("GET")
 	router.HandleFunc("/appointments/{uuid}", appointmentHandler.UpdateAppointment).Methods("PUT")
 	router.HandleFunc("/appointments/{uuid}", appointmentHandler.DeleteAppointment).Methods("DELETE")
+	router.HandleFunc("/authenticate", authenticationHelper.Authenticate).Methods("GET")
 
 	// Start the server
 	http.ListenAndServe(":8080", router)

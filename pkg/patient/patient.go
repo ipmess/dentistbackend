@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/ipmess/dentistbackend/pkg/authenticationHelper"
 	"github.com/ipmess/dentistbackend/pkg/models"
 	"gorm.io/gorm"
 )
@@ -33,8 +34,24 @@ func PrintPatient(patient models.Patient) {
 }
 
 func (h *HTTPHandler) NewPatient(w http.ResponseWriter, r *http.Request) {
+	// verify the JWT authentication:
+	tokenString := r.Header.Get("Authorization")
+	if tokenString == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "Missing authorization header")
+		return
+	}
+	tokenString = tokenString[len("Bearer "):]
+
+	_, err := authenticationHelper.ValidateJWT(tokenString)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "Invalid token")
+		return
+	}
+
 	var patient models.Patient
-	err := json.NewDecoder(r.Body).Decode(&patient)
+	err = json.NewDecoder(r.Body).Decode(&patient)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
