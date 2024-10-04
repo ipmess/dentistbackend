@@ -11,6 +11,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/ipmess/dentistbackend/pkg/appointments"
+	"github.com/ipmess/dentistbackend/pkg/models"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -52,7 +55,7 @@ func populate(ctx context.Context, db *gorm.DB) error {
 	// Load sample data from JSON files
 	// Start by loading the sample appointment types:
 	appointmentTypesFilename := "apptypes.json"
-	var AppointmentTypes []AppointmentType
+	var AppointmentTypes []models.AppointmentType
 	file, err := os.Open(appointmentTypesFilename)
 	if err != nil {
 		log.Printf("Error opening file %s: %s\n", appointmentTypesFilename, err)
@@ -85,8 +88,8 @@ func populate(ctx context.Context, db *gorm.DB) error {
 	fmt.Println("Appointment types created successfully")
 
 	// next, we will write sample patient data into the Patient table:
-	patientsFilename := "patients-utf8.json"
-	var samplePatients []Patient
+	patientsFilename := "patients-UTF8.json"
+	var samplePatients []models.Patient
 	file, err = os.Open(patientsFilename)
 	if err != nil {
 		log.Printf("Error opening file %s: %s\n", patientsFilename, err)
@@ -116,7 +119,7 @@ func populate(ctx context.Context, db *gorm.DB) error {
 	// Only this time we have to create 100 appointments spread out throughout the next 2 months:
 
 	// read all appointment types from the database:
-	var appointmentTypes []AppointmentType
+	var appointmentTypes []models.AppointmentType
 	result = db.Find(&appointmentTypes)
 	if result.Error != nil {
 		log.Printf("Error retrieving appointment types from the database:\n %s\n", result.Error)
@@ -124,7 +127,7 @@ func populate(ctx context.Context, db *gorm.DB) error {
 	}
 
 	// read all patients from the database:
-	var patients []Patient
+	var patients []models.Patient
 	result = db.Find(&patients)
 	if result.Error != nil {
 		log.Printf("Error retrieving patients from the database:\n %s\n", result.Error)
@@ -134,8 +137,10 @@ func populate(ctx context.Context, db *gorm.DB) error {
 	// First off, we need to add a single appointment so that the appointment overlap check does not fail due to an empty appointments table:
 	appointmentType := appointmentTypes[rand.Intn(len(appointmentTypes))]
 	patient := patients[rand.Intn(len(patients))]
-	startTime := time.Now()
-	appointment := Appointment{
+	startTime := time.Now().AddDate(0, 0, -2)
+	tempUUID, _ := uuid.NewV7()
+	newAppointment := models.Appointment{
+		UUID:              tempUUID.String(),
 		PatientID:         patient.ID,
 		AppointmentTypeID: appointmentType.ID,
 		StartTime:         startTime,
@@ -149,13 +154,13 @@ func populate(ctx context.Context, db *gorm.DB) error {
 		AppointmentType:   appointmentType,
 	}
 
-	if err := db.Create(&appointment).Error; err != nil {
+	if err := db.Create(&newAppointment).Error; err != nil {
 		log.Printf("Error creating initial appointment:\n %s\n", err)
 		return err
 	}
 
-	// We will create 100 appointments:
-	for i := 0; i < 100; i++ {
+	// We will create ~100 appointments:
+	for i := 0; i < 115; i++ {
 		// Randomly select an appointment type from appointmentTypes:
 		appointmentType = appointmentTypes[rand.Intn(len(appointmentTypes))]
 		// Randomly select a patient from patients:
@@ -175,7 +180,9 @@ func populate(ctx context.Context, db *gorm.DB) error {
 		for startTime.Weekday() == time.Saturday || startTime.Weekday() == time.Sunday {
 			startTime = startTime.AddDate(0, 0, 1)
 		}
-		appointment = Appointment{
+		tempUUID, _ := uuid.NewV7()
+		newAppointment = models.Appointment{
+			UUID:              tempUUID.String(),
 			PatientID:         patient.ID,
 			AppointmentTypeID: appointmentType.ID,
 			StartTime:         startTime,
@@ -189,7 +196,7 @@ func populate(ctx context.Context, db *gorm.DB) error {
 			AppointmentType:   appointmentType,
 		}
 
-		_, err = CreateAppointment(ctx, db, appointment)
+		_, err = appointments.CreateAppointment(ctx, db, newAppointment)
 		if err != nil {
 			log.Printf("Couldn't create random appointment: %s\n", err)
 		}

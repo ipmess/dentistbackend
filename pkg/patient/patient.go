@@ -1,4 +1,4 @@
-package main
+package patient
 
 import (
 	"context"
@@ -9,41 +9,31 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/ipmess/dentistbackend/pkg/models"
 	"gorm.io/gorm"
 )
 
-type Patient struct {
-	// A structure to hold patient data
-	gorm.Model
-	ID                uint   `gorm:"primaryKey;autoIncrement"`
-	uuid              string `gorm:"type:uuid;default:UUIDv7();unique;not null"`
-	Name              string `gorm:"type:varchar(255);not null"`
-	PhoneNumber       string `gorm:"type:varchar(20)"`
-	Email             string `gorm:"type:varchar(255)"`
-	Viber             bool
-	Whatsapp          bool
-	SMS               bool
-	EmailNotification bool
-	ReminderDays      int
-	Appointments      []Appointment `gorm:"foreignKey:PatientID"` // Relationship with Appointments
+type HTTPHandler struct {
+	DB  *gorm.DB
+	Ctx context.Context
 }
 
 // CreatePatient creates a new patient record in the database
-func CreatePatient(ctx context.Context, db *gorm.DB, patient Patient) (Patient, error) {
+func CreatePatient(ctx context.Context, db *gorm.DB, patient models.Patient) (models.Patient, error) {
 	if err := db.Create(&patient).Error; err != nil {
-		return Patient{}, err
+		return models.Patient{}, err
 	}
 	return patient, nil
 }
 
 // PrintPatient prints the patient details
-func PrintPatient(patient Patient) {
+func PrintPatient(patient models.Patient) {
 	patient_json, _ := json.MarshalIndent(patient, "", "  ")
 	fmt.Println(string(patient_json))
 }
 
-func NewPatient(w http.ResponseWriter, r *http.Request) {
-	var patient Patient
+func (h *HTTPHandler) NewPatient(w http.ResponseWriter, r *http.Request) {
+	var patient models.Patient
 	err := json.NewDecoder(r.Body).Decode(&patient)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -54,9 +44,9 @@ func NewPatient(w http.ResponseWriter, r *http.Request) {
 	patient.UpdatedAt = time.Now()
 	patient.ID = 0
 	tempUUID, _ := uuid.NewV7()
-	patient.uuid = tempUUID.String()
+	patient.UUID = tempUUID.String()
 
-	patient, err = CreatePatient(ctx, db, patient)
+	patient, err = CreatePatient(h.Ctx, h.DB, patient)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -65,19 +55,19 @@ func NewPatient(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(patient)
 }
 
-func ListPatients(w http.ResponseWriter, r *http.Request) {
-	var patients []Patient
-	db.Find(&patients)
+func (h *HTTPHandler) ListPatients(w http.ResponseWriter, r *http.Request) {
+	var patients []models.Patient
+	h.DB.Find(&patients)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(patients)
 }
 
-func GetPatient(w http.ResponseWriter, r *http.Request) {
+func (h *HTTPHandler) GetPatient(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	uuid := vars["uuid"]
-	var patients []Patient
-	var patient Patient
-	db.Where("uuid = ?", uuid).Find(&patients)
+	var patients []models.Patient
+	var patient models.Patient
+	h.DB.Where("uuid = ?", uuid).Find(&patients)
 	if len(patients) == 0 {
 		http.Error(w, "Patient not found", http.StatusNotFound)
 		return
@@ -91,22 +81,22 @@ func GetPatient(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func UpdatePatient(w http.ResponseWriter, r *http.Request) {
+func (h *HTTPHandler) UpdatePatient(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	uuid := vars["uuid"]
-	var patient Patient
-	var patients []Patient
+	var patient models.Patient
+	var patients []models.Patient
 	err := json.NewDecoder(r.Body).Decode(&patient)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	db.Where("uuid = ?", uuid).Find(&patients)
+	h.DB.Where("uuid = ?", uuid).Find(&patients)
 	if len(patients) == 0 {
 		http.Error(w, "Patient not found", http.StatusNotFound)
 		return
 	} else if len(patients) == 1 {
-		db.Model(&patients[0]).Updates(&patient)
+		h.DB.Model(&patients[0]).Updates(&patient)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(patients[0])
 	} else {
@@ -114,16 +104,16 @@ func UpdatePatient(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DeletePatient(w http.ResponseWriter, r *http.Request) {
+func (h *HTTPHandler) DeletePatient(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	uuid := vars["uuid"]
-	var patients []Patient
-	db.Where("uuid = ?", uuid).Find(&patients)
+	var patients []models.Patient
+	h.DB.Where("uuid = ?", uuid).Find(&patients)
 	if len(patients) == 0 {
 		http.Error(w, "Patient not found", http.StatusNotFound)
 		return
 	} else if len(patients) == 1 {
-		db.Delete(&patients[0])
+		h.DB.Delete(&patients[0])
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(patients[0])
 	} else {
