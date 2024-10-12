@@ -82,7 +82,7 @@ The backend will also:
 * Synchronize all appointment and patient data between the web application and the mobile app
 * Provide appointment and patient data to the web application and the mobile app.
 
-### Backend Components:
+## Backend Components
 
 - **API Server**: Developed using Go frameworks like **Gin**, the API will manage the following endpoints:
 
@@ -130,13 +130,13 @@ The endpoint testing should test the REST API endpoints.
 * AWS EC2 or Lambda: The Go API will run on AWS.
 * AWS RDS with MariaDB: Use AWS RDS for storage of appointment and patient data.
 
-2. Frontend Components
+## Frontend Components
 
 ### Web Application (Desktop):
 
-The desktop interface will be built using React.js to provide an experience similar to Google Calendar with advanced filtering options.
+The desktop interface will be built using Next.js to provide an experience similar to Google Calendar with advanced filtering options.
 
-* Calendar Views: Integrate FullCalendar.js to support monthly, weekly, and daily views.
+* Calendar Views: Integrate the `FullCalendar` library to support monthly, weekly, and daily views.
   * Drag-and-drop rescheduling for appointments.
   * Click-to-create interactions and tooltips to display appointment details.
   * Custom Filters: The Dentist will be able to filter appointments by type, patient, or time range.
@@ -145,6 +145,56 @@ The desktop interface will be built using React.js to provide an experience simi
   * Select a patient from a searchable dropdown.
   * Auto-populate patient details, including phone numbers and email.
   * Select appointment types and time slots with ease.
+
+#### User Interface (UI)
+
+The front-end will be built using Next.js, which offers server-side rendering (SSR) and static site generation (SSG) out of the box, improving both performance. The UI will feature:
+
+* Interactive Calendar Views (monthly, weekly, daily): The dentist can view, create, and manage appointments. The UI will use components from `FullCalendar.io`, allowing drag-and-drop features to reschedule appointments easily.
+* Appointment Forms: Modal-based forms for creating new appointments, complete with validation and auto-complete features for patient details.
+* Responsive Design: The UI will be fully responsive and mobile-friendly, ensuring that the dentist can manage appointments from any device.
+
+#### Routing
+
+Next.js uses file-based routing. Each page in the pages/ directory corresponds to a route. For example:
+        
+* `pages/index.js`: Home or dashboard.
+* `pages/appointments.js`: Calendar view of all appointments.
+* `pages/patients/[id].js`: Patient details view, using dynamic routing for individual patient data.
+
+#### Data Fetching
+
+Next. js data fetching strategies:
+
+* `getStaticProps`: For static patient data (e.g., general patient information), to be rendered at build time.
+* `getServerSideProps`: For dynamic appointment data that changes frequently, such as the calendar view, ensuring the latest appointments are shown on every page load.
+
+#### Rendering
+
+* _Server-Side Rendering_ (SSR) will be used for pages like the calendar and patient dashboard, ensuring fast load times and SEO benefits.
+* _Client-Side Rendering_ (CSR) will handle real-time updates (like drag-and-drop appointments) without reloading the entire page.
+* _Static Site Generation_ (SSG) will be used for pages that do not frequently change, such as patient profiles or general information.
+
+#### Integrations
+
+The frontend Next.js application will integrate with the following components:
+
+* The Backend
+* Authentication?
+
+#### Performance
+
+To optimize the Frontend performance, several techniques will be employed:
+
+* Code splitting: Next.js automatically splits the code, loading only the necessary JS and CSS for the current page, reducing initial load times.
+* Lazy loading: Components such as patient search results and large appointment calendars will be lazily loaded, improving performance.
+
+#### Developer Experience
+
+* TypeScript will be used for the front-end code, increasing type safety.
+* Linting and Prettier will be integrated to maintain clean and consistent code.
+* ESLint will be used to enforce coding standards on the frontend application.
+* Docker: Eventually, a Dockerized development environment should be developed.  A docker environment will provide a more consistent behavior between the development and production environments.
 
 ### Mobile Application:
 
@@ -158,7 +208,7 @@ The mobile app will be developed using React Native with Expo to streamline deve
 
 * Redux will be used for state management, to maintain a consistent state across both web and mobile applications.
 
-3. Database and Synchronization
+## Database and Synchronization
 
 ### Database:
 
@@ -202,7 +252,7 @@ The backend will communicate with MariaDB running on AWS RDS. The MariaDB databa
 
 ## User Experience (UX)
 
-To ensure the system is intuitive and easy to use, the following key UX features will be included:
+To ensure the system is intuitive and easy to use, the following UX features will be included:
 
 * Google Calendar-Like Interface: Both web and mobile interfaces will resemble Google Calendar, providing familiar navigation and scheduling features.
 * Custom Filters: The ability to filter appointments by patient, type, or time range enhances usability.
@@ -213,7 +263,7 @@ To ensure the system is intuitive and easy to use, the following key UX features
 
 ### Frontend Deployment:
 
-* React.js Web App: Deploy the web-based frontend via Netlify or on an AWS EC2 instance behind Nginx.
+* Next.js Web App: Deploy the web-based frontend via Netlify or on an AWS EC2 instance. If it is necessary, host the Next.js app behind Nginx.
 * React Native Mobile App: Deploy the mobile app using Expo, and submit it to the Apple App Store.
 
 ### Backend Deployment:
